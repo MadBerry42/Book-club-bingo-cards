@@ -33,11 +33,13 @@ def get_book_pile():
 
 def add_book_pile(title, book_pile):
     if title not in book_pile:
-        supabase.table('books_pile').insert({'title': title}).execute()
+        response = supabase.table('books_pile').insert({'title': title}).execute()
+        return response.data[0] if response.data else None
     else:
         st.error("Book already on the shelf!")
+        return None
 
-# Artwork: Use HTML/CSS to select the style for different parts of the window
+# -------- 3. Artwork: Use HTML/CSS to select the style for different parts of the window--------
 st.markdown("""
 <style>
     .book_pile div.stButton > button {
@@ -59,24 +61,75 @@ st.markdown("""
         transform: translateX(-5px);
         background-color: #689f74 !important;
     }
-
+            
+    .corkboard {
+        position: relative;
+        width: 100%;
+        height: 600px;
+        background-color: #b87333;
+        border-radius: 8px;
+        box-shadow: inset 0px 4px 10px rgba(0, 0, 0, 0, 2);
+        overflow: hidden;
+    }
+            
+    .post-it {
+            position: absolute;
+            width: 140px;
+            min-height: 140px;
+            padding: 12px;
+            box-shadow: 3px 3px 8px rgba(0, 0, 0, 0, 0.3);
+            border-radius: 2px;
+            transition: transform 0.15s linear;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: 'Courier New';
+            font-size: 14px;
+            color: #333;
+            line-height: 1.2;
+            word-wrap: break-word;
+            transform: rotate(-1deg);
+    }
+            
+    .post-it-text{
+        font-size: 16px;
+            font-weight: bold;
+            line-height: 1.3;
+            word-wrap: break-word;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-if "libro_attivo" not in st.session_state:
-    st.session_state.libro_attivo = None
+postit_colors = {
+    "🟡 Yellow": "#fef5c1",
+    "💗 Pink": "#ffcce6",
+    "🔵 Light blue": "#d0e8f2",
+    "🟢 Green": "#dbf3c9",
+    "🟣 Purple": "#e8d7f1"
+}
+
+if "active_book" not in st.session_state:
+    st.session_state.active_book = None
 
 def remove_book(title):
-    supabase.table('books_pile').delete().eq({'title': title}).execute()
+    supabase.table('books_pile').delete().eq('title', title).execute()
 
 #--------------------------------  3. Bingo cards ------------------------------------------------
 def get_cards_for_book(title): # Function that retrieves all the tasks from the todo database
-    response = supabase.table('cards').select('*').eq('title').execute()  # select('*') = select all columns and execute the query
+    response = supabase.table('cards').select('*').eq('title', title).execute()  # select('*') = select all columns and execute the query
     return response.data #results of the query, contains all the columns in the table
 
-def add_card(card): # Add a task to the list
+def add_card(card, title, color): # Add a task to the list
     supabase.table('cards').insert({
-        'card': card}).execute()
+        'card': card,
+        'title': title,
+        'color': color,
+        'x_pos': 40,
+        'y_pos': 40
+        }).execute()
+    
+def update_card_position(card_id, x, y):
+    supabase.table('cards').update({'x_pos': x, 'y_pos':y}).eq('id', card_id).execute()
 
 st.title("Bingo card list")
 
@@ -92,8 +145,9 @@ with col_book_pile:
 
         if confirm_button:
             if new_book.strip():
-                if add_book_pile(new_book, book_pile):
-                    st.session_state.libro_attivo = new_book
+                created_book = add_book_pile(new_book, book_pile)
+                if created_book:
+                    st.session_state.active_book = created_book
                     st.rerun()
 
     with st.container(border=False):
@@ -104,12 +158,77 @@ with col_book_pile:
 
             label = f"📖 {book_title}"
             if st.button(label, key=f"btn_{book_id}"):
-                st.session_state.libro_attivo = book
+                st.session_state.active_book = book
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
+    
+if st.session_state.active_book:
+    book_selected = st.session_state.active_book
 
+    with st.popover("Place your post-it"):
+        new_card = st.text_input(" ")
+        color_choice = st.selectbox("Color: ", list(postit_colors.keys()))
 
+        confirm_card = st.button("Appiccica sul muro!")
+        if confirm_card and new_card.strip():
+            colore_hex = postit_colors[color_choice]
+            add_card(new_card, book_selected['title'], colore_hex)
+            st.rerun()
 
+with col_cards:
+    if st.session_state.active_book:
+        book = st.session_state.active_book
+        book_title = book['title'] if isinstance(book, dict) else book
+
+        st.subheader(f"{book_title}")
+        
+        cards_list = get_cards_for_book(book_title)
+        
+        html_corkboard = '<div class="corkboard">'
+        
+        for card in cards_list:
+            # Recuperiamo dati dal DB (con valori di fallback se vuoti)
+            colore = card.get('color', '#fef5c1')
+            x = card.get('x_pos', 40)
+            y = card.get('y_pos', 40)
+            testo = card['card']
+            
+            # Posizioniamo il post-it usando top% e left% in base alle sue coordinate
+            html_corkboard += f"""
+            <div class="post-it" style="background-color: {colore}; left: {x}%; top: {y}%;">
+                {testo}
+            </div>
+            """
+        html_corkboard += '</div>'
+        
+        # Mostriamo la bacheca grafica
+        st.markdown(html_corkboard, unsafe_allow_html=True)
+        
+        # --------------------------------------------- Moving the sticky notes --------------------------------------------------
+        st.write("")
+        with st.expander("(Re)move post-its"):
+            if not cards_list:
+                st.write("No post-it on the board")
+            for card in cards_list:
+                # Creiamo una riga per ogni post-it per poterlo regolare
+                c_testo, c_x, c_y, c_del = st.columns([0.4, 0.25, 0.25, 0.1])
+                
+                c_testo.write(f"*{card['card']}*")
+                
+                new_x = c_x.slider("Horizontal (X)", 0, 85, int(card.get('x_pos', 40)), key=f"x_{card['id']}")
+                new_y = c_y.slider("Vertical (Y)", 0, 75, int(card.get('y_pos', 40)), key=f"y_{card['id']}")
+                
+        
+                if new_x != card.get('x_pos') or new_y != card.get('y_pos'):
+                    update_card_position(card['id'], new_x, new_y)
+                    st.rerun()
+                
+                if c_del.button("🗑️", key=f"del_{card['id']}"):
+                    supabase.table('cards').delete().eq('id', card['id']).execute()
+                    st.rerun()
+                    
+    else:
+        st.info("👈 Seleziona a book from the pile!")
         
         
 
