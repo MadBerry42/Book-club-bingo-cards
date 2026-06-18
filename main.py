@@ -194,11 +194,14 @@ with col_cards:
             testo = card['card']
             
             # Posizioniamo il post-it usando top% e left% in base alle sue coordinate
-            html_corkboard += f"""
+            post_it = f"""
             <div class="post-it" style="background-color: {colore}; left: {x}%; top: {y}%;">
                 {testo}
             </div>
-            """
+            """.replace('\n', '')
+
+            html_corkboard += post_it
+
         html_corkboard += '</div>'
         
         # Mostriamo la bacheca grafica
@@ -215,9 +218,9 @@ with col_cards:
                 
                 c_testo.write(f"*{card['card']}*")
                 
+                # Change position with the sliders
                 new_x = c_x.slider("Horizontal (X)", 0, 85, int(card.get('x_pos', 40)), key=f"x_{card['id']}")
                 new_y = c_y.slider("Vertical (Y)", 0, 75, int(card.get('y_pos', 40)), key=f"y_{card['id']}")
-                
         
                 if new_x != card.get('x_pos') or new_y != card.get('y_pos'):
                     update_card_position(card['id'], new_x, new_y)
