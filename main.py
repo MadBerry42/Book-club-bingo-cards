@@ -4,6 +4,7 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 
+
 try:
     from dotenv import load_dotenv
     load_dotenv() # Loads the private credentials securily
@@ -66,9 +67,11 @@ st.markdown("""
         position: relative;
         width: 100%;
         height: 600px;
-        background-color: #b87333;
+        background-image: linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15)), url("https://www.publicdomainpictures.net/pictures/30000/velka/cork-board.jpg");
+        background-size: cover;
+        background-position: center;
         border-radius: 8px;
-        box-shadow: inset 0px 4px 10px rgba(0, 0, 0, 0, 2);
+        box-shadow: inset 0px 4px 10px rgba(0, 0, 0, 0.3);
         overflow: hidden;
     }
             
@@ -169,7 +172,7 @@ if st.session_state.active_book:
         new_card = st.text_input(" ")
         color_choice = st.selectbox("Color: ", list(postit_colors.keys()))
 
-        confirm_card = st.button("Appiccica sul muro!")
+        confirm_card = st.button("Done")
         if confirm_card and new_card.strip():
             colore_hex = postit_colors[color_choice]
             add_card(new_card, book_selected['title'], colore_hex)
