@@ -153,6 +153,15 @@ with col_book_pile:
                     st.session_state.active_book = created_book
                     st.rerun()
 
+    with st.popover("Remove a book"):
+        selected_book = st.selectbox("Book: ", list(book_pile))['title']
+        confirm_button = st.button("Remove")
+
+        if confirm_button:
+            if selected_book.strip():
+                remove_book(selected_book)
+                st.rerun()
+
     with st.container(border=False):
         st.markdown('<div class="book_pile">', unsafe_allow_html=True)
         for book in reversed(book_pile):
@@ -216,7 +225,6 @@ with col_cards:
             if not cards_list:
                 st.write("No post-it on the board")
             for card in cards_list:
-                # Creiamo una riga per ogni post-it per poterlo regolare
                 c_testo, c_x, c_y, c_del = st.columns([0.4, 0.25, 0.25, 0.1])
                 
                 c_testo.write(f"*{card['card']}*")
